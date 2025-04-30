@@ -3,28 +3,41 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    systems.url = "github:nix-systems/default-linux"; #we add support for aarch64-linux
+    flake-utils = {
+      url = "github:numtide/flake-utils";
+      inputs.systems.follows = "systems";
+    };
   };
 
-  outputs = { self, nixpkgs, ... }: 
+  outputs = { self, nixpkgs, flake-utils, ... }: 
+
+    flake-utils.lib.eachDefaultSystem (system: #this function just does everything for every system that we defined above in: inputs.systems.url
+
     let
       # Define your specific system
-      system = "x86_64-linux"; # Change this if you're on a different architecture
+      #system = "x86_64-linux"; # Change this if you're on a different architecture
       
       # Get pkgs for your system
       pkgs = import nixpkgs { inherit system; };
     in {
       # Define the package for your system
-      packages.${system} = {
-        default = pkgs.callPackage ./default.nix {};
-      };
+      packages.default = pkgs.callPackage ./default.nix {};
       
       # Expose as an overlay for easier integration
       overlays.default = final: prev: {
         personal-scripts = self.packages.${prev.system}.default;
       };
+
+      devShells = {  ## Adev shell with all the deps of my-toolkit available (with "$ nix shell .... " command, the deps are not available (like ffmpeg) )
+          default = pkgs.mkShell {
+            packages = [ self.packages.${system}.default ];
+            inputsFrom = [ self.packages.${system}.default ];
+          };
+        };
       
       # NixOS module for easy addition to your system configuration
-      nixosModules.default = { config, lib, pkgs, ... }: {
+      nixosModules = { config, lib, pkgs, ... }: {
         options = {
           my-toolkit = {
             enable = lib.mkEnableOption "Enable my-toolkit";
@@ -37,7 +50,7 @@
 
         config = lib.mkIf config.my-toolkit.enable {
           environment.systemPackages = [ 
-            self.packages.${pkgs.system}.default
+            self.packages.default
             pkgs.python311
           ];
 
@@ -49,7 +62,7 @@
                 wantedBy = [ "default.target" ];
                 path = [ pkgs.inotify-tools pkgs.zenity ];
                 serviceConfig = {
-                  ExecStart = "${self.packages.${pkgs.system}.default}/bin/media-renamer";
+                  ExecStart = "${self.packages.default}/bin/media-renamer";
                   Restart = "always";
                   RestartSec = "5";
                   StandardOutput = "journal";
@@ -69,7 +82,7 @@
                   pkgs.dbus 
                 ];
                 serviceConfig = {
-                  ExecStart = "${self.packages.${pkgs.system}.default}/bin/ebook-organizer";
+                  ExecStart = "${self.packages.default}/bin/ebook-organizer";
                   Restart = "always";
                   RestartSec = "5";
                   StandardOutput = "journal";
@@ -80,5 +93,6 @@
           ];
         };
       };
-    };
+    }
+    );
 }
