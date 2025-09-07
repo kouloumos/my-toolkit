@@ -11,26 +11,30 @@ A collection of personal utility scripts and services for NixOS systems. This to
 
 ## Installation
 
-Add the toolkit to your NixOS configuration by adding the following to your `configuration.nix`:
+Add the toolkit to your NixOS configuration by adding the following to your `flake.nix`:
 
 ```nix
-let
-  scriptsFlake = builtins.getFlake "path:/path/to/my-toolkit";
-in 
-{
-  imports = [
-    scriptsFlake.nixosModules.default
-  ];
+inputs = {
+  my-toolkit.url = "github:kouloumos/my-toolkit";
+  # ... your other inputs
+};
+```
 
-  # Enable the toolkit
-  my-toolkit.enable = true;
+Then in your `configuration.nix`:
 
-  # Optionally enable specific services
-  my-toolkit.services = {
-    media-renamer = true;
-    ebook-organizer = true;
-  };
-}
+```nix
+imports = [
+  inputs.my-toolkit.nixosModules.default
+];
+
+# Enable the toolkit
+my-toolkit.enable = true;
+
+# Optionally enable specific services
+my-toolkit.services = {
+  media-renamer = true;
+  ebook-organizer = true;
+};
 ```
 
 After making changes to your configuration, rebuild your system:

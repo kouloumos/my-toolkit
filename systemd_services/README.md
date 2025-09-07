@@ -70,7 +70,7 @@ To add a new service:
          wantedBy = [ "default.target" ];
          path = [ pkgs.required-dependencies ];
          serviceConfig = {
-           ExecStart = "${self.packages.${pkgs.system}.default}/bin/my-service";
+           ExecStart = "${self.packages.default}/bin/my-service";
            Restart = "always";
            RestartSec = "5";
            StandardOutput = "journal";
