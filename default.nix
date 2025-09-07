@@ -26,12 +26,18 @@ let
   mytoolkit = pkgs.writeScriptBin "my-toolkit" ''
     #!${pkgs.bash}/bin/bash
 
-    # Get the directory where my-toolkit is installed
-    SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-    PYTHON_SCRIPTS_DIR="$SCRIPT_DIR/../lib/python-scripts"
-
-    # Define script directories
-    SCRIPT_DIRS=(${scriptDirsStr})
+    # Check if we're in development mode
+    if [ "''${MY_TOOLKIT_DEV_MODE:-}" = "1" ]; then
+      # Development mode: use source files directly
+      SCRIPT_DIRS=("./shell_scripts" "./systemd_services")
+      PYTHON_SCRIPTS_DIR="./python_scripts"
+    else
+      # Production mode: use installed files
+      SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+      PYTHON_SCRIPTS_DIR="$SCRIPT_DIR/../lib/python-scripts"
+      # Define script directories
+      SCRIPT_DIRS=(${scriptDirsStr})
+    fi
 
     function list_scripts() {
       echo "Available scripts:"

@@ -46,6 +46,15 @@
           packages = [ self.packages.${system}.default ];
           inputsFrom = [ self.packages.${system}.default ];
           
+          shellHook = ''
+            export MY_TOOLKIT_DEV_MODE=1
+            echo "🛠️  My-Toolkit Development Environment"
+            echo "📦 Run scripts directly: my-toolkit <script-name> [args]"
+            echo "📝 Available scripts: my-toolkit list"
+            echo "⚡ Changes to scripts are immediately available!"
+            echo ""
+          '';
+          
           # Note: This dev shell includes all runtime dependencies (like ffmpeg for video processing)
           # that are needed by the shell scripts but not automatically available in basic nix shells
         };

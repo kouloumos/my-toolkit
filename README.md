@@ -11,6 +11,8 @@ A collection of personal utility scripts and services for NixOS systems. This to
 
 ## Installation
 
+> **For Development**: If you are contributing or testing changes, see the [Development](#development) section for a faster workflow using `nix develop`.
+
 Add the toolkit to your NixOS configuration by adding the following to your `flake.nix`:
 
 ```nix
@@ -82,6 +84,28 @@ my-toolkit list
 For more information about each service and how to add new ones, see the [Systemd Services README](./systemd_services/README.md).
 
 ## Development
+
+### Development Workflow
+
+For development and testing, simply use the development environment:
+
+```bash
+# Clone the repository
+git clone https://github.com/kouloumos/my-toolkit.git
+cd my-toolkit
+
+# Enter development environment (instant)
+nix develop
+
+# Test scripts directly from source
+my-toolkit video2gif input.mp4
+my-toolkit book-downloader
+
+# Or run scripts without entering the shell
+nix develop --command my-toolkit video2gif input.mp4
+```
+
+This approach provides instant feedback - any changes you make to scripts are immediately available for testing without rebuilding your system.
 
 ### Project Structure
 
