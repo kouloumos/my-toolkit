@@ -86,7 +86,7 @@
         config = lib.mkIf config.my-toolkit.enable {
           # Install packages system-wide
           environment.systemPackages = [ 
-            self.packages.${pkgs.system}.default
+            (pkgs.callPackage ./default.nix {})
             pkgs.python311  # Required for Python scripts
           ];
 
@@ -107,7 +107,7 @@
                 ];
                 
                 serviceConfig = {
-                  ExecStart = "${self.packages.${pkgs.system}.default}/bin/media-renamer";
+                  ExecStart = "${pkgs.callPackage ./default.nix {}}/bin/media-renamer";
                   Restart = "always";
                   RestartSec = "5";
                   StandardOutput = "journal";
@@ -132,7 +132,7 @@
                 ];
                 
                 serviceConfig = {
-                  ExecStart = "${self.packages.${pkgs.system}.default}/bin/ebook-organizer";
+                  ExecStart = "${pkgs.callPackage ./default.nix {}}/bin/ebook-organizer";
                   Restart = "always";
                   RestartSec = "5";
                   StandardOutput = "journal";
