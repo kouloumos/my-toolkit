@@ -67,6 +67,7 @@ my-toolkit book-downloader
 
 - **[`video2gif`](./shell_scripts/video2gif.sh)**: Converts video files to optimized GIF format
 - **[`merge_videos`](./shell_scripts/merge_videos.sh)**: Merges multiple WebM video files
+- **[`upload_to_remarkable`](./shell_scripts/upload_to_remarkable.sh)**: Uploads files (PDF, EPUB, TXT) to reMarkable tablet via USB
 
 #### Python Scripts
 
