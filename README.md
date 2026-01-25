@@ -65,12 +65,15 @@ my-toolkit book-downloader
 
 #### Shell Scripts
 
+- **[`download-torrent`](./shell_scripts/download-torrent.sh)**: Downloads torrent files or magnet links using transmission-cli, with optional automatic subtitle search
 - **[`video2gif`](./shell_scripts/video2gif.sh)**: Converts video files to optimized GIF format
 - **[`merge_videos`](./shell_scripts/merge_videos.sh)**: Merges multiple WebM video files
 - **[`upload_to_remarkable`](./shell_scripts/upload_to_remarkable.sh)**: Uploads files (PDF, EPUB, TXT) to reMarkable tablet via USB
+- **[`epub-to-kindle`](./python_scripts/epub-to-kindle.sh)**: Converts all EPUB files in a folder to Amazon Kindle format (AZW3)
 
 #### Python Scripts
 
+- **[`find-subtitles`](./python_scripts/find-subtitles.py)**: Finds and downloads subtitles for video files in multiple languages
 - **[`book-downloader`](./python_scripts/book-downloader.py)**: Downloads e-books from various sources
 - **[`txt-to-docx`](./python_scripts/txt-to-docx.py)**: Converts text files to DOCX format
 

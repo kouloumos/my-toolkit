@@ -4,6 +4,7 @@ let
   # Define dependencies once in a variable we can reference later
   dependencies = with pkgs; [
     ffmpeg
+    transmission # for download-torrent.sh
     # Add other dependencies your scripts need
   ];
 
@@ -11,6 +12,7 @@ let
   pythonEnv = pkgs.python311.withPackages (ps: with ps; [
     requests # for book-downloader.py
     python-docx # for txt-to-docx.py
+    subliminal # for find-subtitles.py
   ]);
 
   # Define script directories
