@@ -272,55 +272,51 @@
                   };
                 };
               })
-            ];
 
-            # =============================================================
-            # RESIDENTIAL PROXY - User-level service
-            # =============================================================
-            # Residential Proxy (changed to user service to access user config)
-            (lib.mkIf config.my-toolkit.services.residential-proxy {
-              systemd.user.services.residential-proxy = {
-                description = "Residential Proxy (Squid) for My Toolkit";
-                after = [ "network.target" ];
-                wantedBy = [ "default.target" ];
+              # Residential Proxy Service
+              (lib.mkIf config.my-toolkit.services.residential-proxy {
+                residential-proxy = {
+                  description = "Residential Proxy (Squid) for My Toolkit";
+                  after = [ "network.target" ];
+                  wantedBy = [ "default.target" ];
 
-                # Path to Squid binary from system's pkgs
-                path = [ pkgs.squid ];
+                  # Path to Squid binary from system's pkgs
+                  path = [ pkgs.squid ];
 
-                serviceConfig = {
-                  Type = "forking";
-                  PIDFile = "%t/squid.pid";
-                  ExecStart = "${pkgs.squid}/bin/squid -f %h/.config/my-toolkit/squid.conf";
-                  ExecReload = "${pkgs.squid}/bin/squid -k reconfigure";
-                  ExecStop = "${pkgs.squid}/bin/squid -k shutdown";
-                  KillMode = "mixed";
-                  Restart = "on-failure";
-                  RestartSec = "5";
+                  serviceConfig = {
+                    Type = "forking";
+                    PIDFile = "%t/squid.pid";
+                    ExecStart = "${pkgs.squid}/bin/squid -f %h/.config/my-toolkit/squid.conf";
+                    ExecReload = "${pkgs.squid}/bin/squid -k reconfigure";
+                    ExecStop = "${pkgs.squid}/bin/squid -k shutdown";
+                    KillMode = "mixed";
+                    Restart = "on-failure";
+                    RestartSec = "5";
 
-                  # Security settings
-                  PrivateTmp = true;
-                  NoNewPrivileges = true;
+                    # Security settings
+                    PrivateTmp = true;
+                    NoNewPrivileges = true;
+                  };
+
+                  preStart = ''
+                    # Check if configuration exists
+                    if [ ! -f "$HOME/.config/my-toolkit/squid.conf" ]; then
+                      echo "Error: Squid configuration not found at $HOME/.config/my-toolkit/squid.conf"
+                      echo "Run: my-toolkit proxy-setup configure <proxy-url>"
+                      exit 1
+                    fi
+
+                    # Create cache directory in user space
+                    mkdir -p $HOME/.cache/my-toolkit/squid
+
+                    # Initialize Squid cache if needed
+                    if [ ! -d "$HOME/.cache/my-toolkit/squid/00" ]; then
+                      ${pkgs.squid}/bin/squid -z -f $HOME/.config/my-toolkit/squid.conf
+                    fi
+                  '';
                 };
-
-                preStart = ''
-                  # Check if configuration exists
-                  if [ ! -f "$HOME/.config/my-toolkit/squid.conf" ]; then
-                    echo "Error: Squid configuration not found at $HOME/.config/my-toolkit/squid.conf"
-                    echo "Run: my-toolkit proxy-setup configure <proxy-url>"
-                    exit 1
-                  fi
-
-                  # Create cache directory in user space
-                  mkdir -p $HOME/.cache/my-toolkit/squid
-
-                  # Initialize Squid cache if needed
-                  if [ ! -d "$HOME/.cache/my-toolkit/squid/00" ]; then
-                    ${pkgs.squid}/bin/squid -z -f $HOME/.config/my-toolkit/squid.conf
-                  fi
-                '';
-              };
-            })
+              })
+            ];
           };
-        };
     };
 }
