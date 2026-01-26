@@ -235,7 +235,7 @@
                   # Required system packages for the service
                   path = [
                     pkgs.inotify-tools  # File system monitoring
-                    pkgs.zenity         # GUI dialogs
+                    (if (builtins.hasAttr "zenity" pkgs) then pkgs.zenity else pkgs.gnome.zenity)  # GUI dialogs
                   ];
 
                   serviceConfig = {
@@ -257,7 +257,7 @@
                   # Required system packages for the service
                   path = [
                     pkgs.calibre        # E-book management
-                    pkgs.zenity         # GUI dialogs
+                    (if (builtins.hasAttr "zenity" pkgs) then pkgs.zenity else pkgs.gnome.zenity)  # GUI dialogs
                     pkgs.inotify-tools  # File system monitoring
                     pkgs.procps         # Process utilities
                     pkgs.dbus           # Inter-process communication

@@ -6,8 +6,20 @@ Find and download subtitles for video files using subliminal.
 
 import argparse
 import sys
+import os
 from pathlib import Path
 from typing import List, Optional
+
+# Setup proxy configuration before importing subliminal
+# This ensures subliminal's requests will use the proxy
+try:
+    from toolkit_utils import ProxyConfig
+    proxy_config = ProxyConfig()
+    if proxy_config.enabled and not os.environ.get('HTTP_PROXY'):
+        os.environ['HTTP_PROXY'] = proxy_config.url
+        os.environ['HTTPS_PROXY'] = proxy_config.url
+except ImportError:
+    pass
 
 try:
     from subliminal import (

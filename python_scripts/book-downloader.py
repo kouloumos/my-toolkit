@@ -1,9 +1,22 @@
 # related: https://github.com/famotime/ebook_toolbox
-from Zlibrary import Zlibrary
 import os
 import json
 from getpass import getpass
 import argparse
+
+# Setup proxy configuration before importing Zlibrary
+# This ensures Zlibrary's requests will use the proxy
+try:
+    from toolkit_utils import ProxyConfig
+    proxy_config = ProxyConfig()
+    if proxy_config.enabled and not os.environ.get('HTTP_PROXY'):
+        os.environ['HTTP_PROXY'] = proxy_config.url
+        os.environ['HTTPS_PROXY'] = proxy_config.url
+        print(f"Using proxy: {proxy_config.url}")
+except ImportError:
+    pass
+
+from Zlibrary import Zlibrary
 
 
 class Config:
