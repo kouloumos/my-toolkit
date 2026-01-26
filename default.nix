@@ -4,7 +4,12 @@ let
   # Define dependencies once in a variable we can reference later
   dependencies = with pkgs; [
     ffmpeg
-    transmission # for download-torrent.sh
+    # Use transmission_3 if available (unstable), otherwise transmission (stable)
+    (if (builtins.hasAttr "transmission_3" pkgs) then transmission_3 else transmission)
+    bubblewrap # for torrent-watch.py isolation
+    vlc # for torrent-watch.py video playback
+    cacert # SSL certificates for HTTPS requests
+    squid # for residential-proxy service (marked insecure, to be replaced later)
     # Add other dependencies your scripts need
   ];
 
@@ -13,6 +18,7 @@ let
     requests # for book-downloader.py
     python-docx # for txt-to-docx.py
     subliminal # for find-subtitles.py
+    certifi # SSL certificates for Python requests
   ]);
 
   # Define script directories
@@ -27,6 +33,13 @@ let
   # Create the my-toolkit command
   mytoolkit = pkgs.writeScriptBin "my-toolkit" ''
     #!${pkgs.bash}/bin/bash
+
+    # Set SSL certificate paths for Python requests
+    # Use certifi's certificate bundle which is included in the Python environment
+    export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    export NIX_SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    export REQUESTS_CA_BUNDLE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    export CURL_CA_BUNDLE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
 
     # Check if we're in development mode
     if [ "''${MY_TOOLKIT_DEV_MODE:-}" = "1" ]; then
