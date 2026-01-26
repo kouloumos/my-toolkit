@@ -275,21 +275,22 @@
             ];
 
             # =============================================================
-            # SYSTEMD SERVICES - System-level services
+            # RESIDENTIAL PROXY - User-level service
             # =============================================================
-            systemd.services = lib.mkIf config.my-toolkit.services.residential-proxy {
-              residential-proxy = {
+            # Residential Proxy (changed to user service to access user config)
+            (lib.mkIf config.my-toolkit.services.residential-proxy {
+              systemd.user.services.residential-proxy = {
                 description = "Residential Proxy (Squid) for My Toolkit";
                 after = [ "network.target" ];
-                wantedBy = [ "multi-user.target" ];
+                wantedBy = [ "default.target" ];
 
-                # Path to Squid binary from system's pkgs (allowInsecure configured above)
+                # Path to Squid binary from system's pkgs
                 path = [ pkgs.squid ];
 
                 serviceConfig = {
                   Type = "forking";
-                  PIDFile = "/run/squid.pid";
-                  ExecStart = "${pkgs.squid}/bin/squid -f \${HOME}/.config/my-toolkit/squid.conf";
+                  PIDFile = "%t/squid.pid";
+                  ExecStart = "${pkgs.squid}/bin/squid -f %h/.config/my-toolkit/squid.conf";
                   ExecReload = "${pkgs.squid}/bin/squid -k reconfigure";
                   ExecStop = "${pkgs.squid}/bin/squid -k shutdown";
                   KillMode = "mixed";
@@ -299,15 +300,6 @@
                   # Security settings
                   PrivateTmp = true;
                   NoNewPrivileges = true;
-
-                  # Create runtime directory
-                  RuntimeDirectory = "squid";
-                  StateDirectory = "squid";
-                  CacheDirectory = "squid";
-                  LogsDirectory = "squid";
-
-                  # User/Group (run as current user to access config)
-                  DynamicUser = false;
                 };
 
                 preStart = ''
@@ -318,17 +310,16 @@
                     exit 1
                   fi
 
-                  # Create log directory if needed
-                  mkdir -p /var/log/squid
-                  chmod 755 /var/log/squid
+                  # Create cache directory in user space
+                  mkdir -p $HOME/.cache/my-toolkit/squid
 
                   # Initialize Squid cache if needed
-                  if [ ! -d /var/cache/squid ]; then
+                  if [ ! -d "$HOME/.cache/my-toolkit/squid/00" ]; then
                     ${pkgs.squid}/bin/squid -z -f $HOME/.config/my-toolkit/squid.conf
                   fi
                 '';
               };
-            };
+            })
           };
         };
     };
