@@ -9,6 +9,7 @@ let
     bubblewrap # for torrent-watch.py isolation
     vlc # for torrent-watch.py video playback
     cacert # SSL certificates for HTTPS requests
+    git # for worktree-manager.py
     squid # for residential-proxy service (marked insecure, to be replaced later)
     # Add other dependencies your scripts need
   ];

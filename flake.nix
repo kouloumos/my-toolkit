@@ -174,6 +174,9 @@
           upload-to-remarkable = mkApp "upload-to-remarkable";
           book-downloader = mkApp "book-downloader";
 
+          # Development workflow
+          worktree-manager = mkApp "worktree-manager";
+
           # Proxy and diagnostics
           proxy-setup = mkApp "proxy-setup";
           health-check = mkApp "health-check";

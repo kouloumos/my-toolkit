@@ -80,7 +80,7 @@ nix run github:kouloumos/my-toolkit#video2gif -- input.mp4 output.gif
 nix run github:kouloumos/my-toolkit#find-subtitles -- movie.mkv
 ```
 
-**Available apps:** `torrent-search`, `torrent-list`, `torrent-watch`, `torrent-cleanup`, `download-torrent`, `find-subtitles`, `video2gif`, `upload-to-remarkable`, `book-downloader`
+**Available apps:** `torrent-search`, `torrent-list`, `torrent-watch`, `torrent-cleanup`, `download-torrent`, `find-subtitles`, `video2gif`, `upload-to-remarkable`, `book-downloader`, `worktree-manager`
 
 This is perfect for:
 - 🚀 Trying the tools before installing
@@ -127,6 +127,7 @@ my-toolkit torrent-cleanup 1
 - **[`find-subtitles`](./python_scripts/find-subtitles.py)**: Finds and downloads subtitles for video files in multiple languages
 - **[`book-downloader`](./python_scripts/book-downloader.py)**: Downloads e-books from various sources
 - **[`txt-to-docx`](./python_scripts/txt-to-docx.py)**: Converts text files to DOCX format
+- **[`worktree-manager`](./python_scripts/worktree-manager.py)**: Manage git worktrees interactively or scriptably (create, teardown, list)
 
 ### Systemd Services
 
@@ -374,6 +375,22 @@ my-toolkit.services.media-renamer = true;
 - ✅ System-wide availability
 - ✅ Systemd service integration
 - ✅ Declarative configuration
+
+### 3b. Local Development Install (NixOS Module)
+For developing the toolkit while having it system-integrated, use a local path input in your NixOS `flake.nix`:
+```nix
+inputs = {
+  my-toolkit = {
+    url = "path:/home/youruser/path/to/my-toolkit";
+  };
+  # ... your other inputs
+};
+```
+Then import the module as usual in `configuration.nix`. To pick up changes after editing scripts:
+```bash
+sudo nixos-rebuild switch
+```
+No need to update the flake lock — Nix re-evaluates the local path on each rebuild.
 
 ### 4. Development (Nix Develop)
 For contributing or testing changes:
