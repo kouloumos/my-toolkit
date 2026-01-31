@@ -80,7 +80,7 @@ nix run github:kouloumos/my-toolkit#video2gif -- input.mp4 output.gif
 nix run github:kouloumos/my-toolkit#find-subtitles -- movie.mkv
 ```
 
-**Available apps:** `torrent-search`, `torrent-list`, `torrent-watch`, `torrent-cleanup`, `download-torrent`, `find-subtitles`, `video2gif`, `upload-to-remarkable`, `book-downloader`, `worktree-manager`
+**Available apps:** `torrent-search`, `torrent-list`, `torrent-watch`, `torrent-cleanup`, `download-torrent`, `find-subtitles`, `video2gif`, `upload-to-remarkable`, `book-downloader`, `worktree`
 
 This is perfect for:
 - 🚀 Trying the tools before installing
@@ -127,7 +127,7 @@ my-toolkit torrent-cleanup 1
 - **[`find-subtitles`](./python_scripts/find-subtitles.py)**: Finds and downloads subtitles for video files in multiple languages
 - **[`book-downloader`](./python_scripts/book-downloader.py)**: Downloads e-books from various sources
 - **[`txt-to-docx`](./python_scripts/txt-to-docx.py)**: Converts text files to DOCX format
-- **[`worktree-manager`](./python_scripts/worktree-manager.py)**: Manage git worktrees interactively or scriptably (create, teardown, list)
+- **[`worktree`](./python_scripts/worktree.py)**: Manage git worktrees interactively or scriptably (create, teardown, list)
 
 ### Systemd Services
 

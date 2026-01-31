@@ -175,7 +175,7 @@
           book-downloader = mkApp "book-downloader";
 
           # Development workflow
-          worktree-manager = mkApp "worktree-manager";
+          worktree = mkApp "worktree";
 
           # Proxy and diagnostics
           proxy-setup = mkApp "proxy-setup";

@@ -192,7 +192,18 @@ def cmd_create(args):
         "copied_files": copied_files,
     }
 
+    # Copy worktree path to clipboard
+    clipboard_ok = False
+    for clip_cmd in [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]:
+        try:
+            subprocess.run(clip_cmd, input=str(worktree_path), text=True, capture_output=True, check=True)
+            clipboard_ok = True
+            break
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
+
     if args.json:
+        result["clipboard"] = clipboard_ok
         print(json.dumps(result))
     else:
         print(f"Worktree created:")
@@ -201,8 +212,10 @@ def cmd_create(args):
         print(f"  Base:   {base}")
         if copied_files:
             print(f"  Copied: {', '.join(copied_files)}")
+        if clipboard_ok:
+            print(f"\n  Path copied to clipboard. Use cd <paste> to navigate.")
         if not config.has_config_file:
-            print(f"\n  Tip: Run 'worktree-manager init' to create a .worktree.json config")
+            print(f"\n  Tip: Run 'my-toolkit worktree init' to create a .worktree.json config")
 
 
 def cmd_teardown(args):
@@ -317,26 +330,26 @@ def main():
         epilog="""
 Examples:
   # Create a worktree (from inside a repo)
-  worktree-manager create feature-x
-  worktree-manager create feature-x --base develop
+  my-toolkit worktree create feature-x
+  my-toolkit worktree create feature-x --base develop
 
   # Create with explicit repo
-  worktree-manager create feature-x --repo /path/to/repo
+  my-toolkit worktree create feature-x --repo /path/to/repo
 
   # Create with JSON output (for agents)
-  worktree-manager create feature-x --json
+  my-toolkit worktree create feature-x --json
 
   # List worktrees
-  worktree-manager list
+  my-toolkit worktree list
 
   # Teardown by branch name
-  worktree-manager teardown --branch feature-x --delete-branch
+  my-toolkit worktree teardown --branch feature-x --delete-branch
 
   # Teardown by path
-  worktree-manager teardown --path /path/to/repo-worktrees/feature-x
+  my-toolkit worktree teardown --path /path/to/repo-worktrees/feature-x
 
   # Initialize config for a project
-  worktree-manager init
+  my-toolkit worktree init
 
 Per-project configuration (.worktree.json in repo root):
   {
