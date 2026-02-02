@@ -305,6 +305,104 @@ def cmd_list(args):
         print(f"  {branch:30s} {head}  {path}")
 
 
+def cmd_land(args):
+    """Fast-forward merge a worktree branch into the base branch and optionally tear down."""
+    repo_path = resolve_repo(args.repo)
+    config = WorktreeConfig(repo_path)
+
+    branch = args.branch
+    if not branch:
+        # Try to detect from cwd if inside a worktree
+        try:
+            result = git("rev-parse", "--abbrev-ref", "HEAD")
+            branch = result.stdout.strip()
+        except RuntimeError:
+            print("Error: branch name is required (or run from inside the worktree)", file=sys.stderr)
+            sys.exit(1)
+
+    base = args.base or config.default_base
+
+    # Verify the branch exists and has commits ahead of base
+    try:
+        log_result = git("log", "--oneline", f"{base}..{branch}", cwd=repo_path)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    commits = [l for l in log_result.stdout.strip().splitlines() if l]
+    if not commits:
+        print(f"Nothing to land: {branch} has no commits ahead of {base}")
+        sys.exit(0)
+
+    if not args.json:
+        print(f"Landing {branch} onto {base} ({len(commits)} commit{'s' if len(commits) != 1 else ''}):")
+        for c in commits:
+            print(f"  {c}")
+
+    # Check for uncommitted changes in the worktree
+    worktrees_dir = get_worktrees_dir(repo_path)
+    worktree_path = worktrees_dir / branch
+    if worktree_path.exists():
+        status = git("status", "--porcelain", cwd=worktree_path)
+        if status.stdout.strip():
+            print(f"Error: Worktree has uncommitted changes. Commit or stash them first.", file=sys.stderr)
+            sys.exit(1)
+
+    # Fast-forward merge on the main repo
+    try:
+        git("checkout", base, cwd=repo_path)
+    except RuntimeError as e:
+        print(f"Error checking out {base}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        git("merge", "--ff-only", branch, cwd=repo_path)
+    except RuntimeError as e:
+        print(f"Error: Cannot fast-forward. Rebase {branch} onto {base} first.", file=sys.stderr)
+        # Go back to whatever branch was checked out
+        git("checkout", "-", cwd=repo_path, check=False)
+        sys.exit(1)
+
+    result_data = {
+        "branch": branch,
+        "base": base,
+        "commits": len(commits),
+        "teardown": False,
+    }
+
+    if not args.json:
+        print(f"\nMerged {branch} into {base} (fast-forward)")
+
+    # Optionally teardown
+    if args.teardown:
+        if worktree_path.exists():
+            cleanup_cmd = config.cleanup_command
+            if cleanup_cmd:
+                if not args.json:
+                    print(f"Running cleanup: {cleanup_cmd}")
+                subprocess.run(cleanup_cmd, shell=True, cwd=worktree_path)
+
+            try:
+                git("worktree", "remove", str(worktree_path), cwd=repo_path)
+            except RuntimeError:
+                git("worktree", "remove", "--force", str(worktree_path), cwd=repo_path)
+
+        # Delete the branch (it's fully merged now, so -d will work)
+        try:
+            git("branch", "-d", branch, cwd=repo_path)
+            result_data["teardown"] = True
+            if not args.json:
+                print(f"Removed worktree and deleted branch {branch}")
+        except RuntimeError as e:
+            print(f"Warning: Could not delete branch: {e}", file=sys.stderr)
+    else:
+        if not args.json:
+            print(f"\nTip: Run 'my-toolkit worktree teardown --branch {branch} --delete-branch' to clean up")
+
+    if args.json:
+        print(json.dumps(result_data))
+
+
 def cmd_init(args):
     """Create a .worktree.json config in the repo root."""
     repo_path = resolve_repo(args.repo)
@@ -341,6 +439,10 @@ Examples:
 
   # List worktrees
   my-toolkit worktree list
+
+  # Land a worktree branch back into main (fast-forward)
+  my-toolkit worktree land feature-x
+  my-toolkit worktree land feature-x --teardown
 
   # Teardown by branch name
   my-toolkit worktree teardown --branch feature-x --delete-branch
@@ -381,6 +483,14 @@ By default (without .worktree.json), .env is copied to new worktrees.
     p_teardown.add_argument("--delete-branch", action="store_true", help="Also delete the branch")
     p_teardown.add_argument("--json", action="store_true", help="Output JSON for scripting")
 
+    # land
+    p_land = subparsers.add_parser("land", help="Fast-forward merge worktree branch into base branch")
+    p_land.add_argument("branch", nargs="?", help="Branch to land (default: current branch)")
+    p_land.add_argument("--base", help="Target branch (default: main, or from .worktree.json)")
+    p_land.add_argument("--repo", help="Path to the git repository (default: auto-detect)")
+    p_land.add_argument("--teardown", action="store_true", help="Remove worktree and delete branch after landing")
+    p_land.add_argument("--json", action="store_true", help="Output JSON for scripting")
+
     # list
     p_list = subparsers.add_parser("list", help="List managed worktrees")
     p_list.add_argument("--repo", help="Path to the git repository (default: auto-detect)")
@@ -397,6 +507,7 @@ By default (without .worktree.json), .env is copied to new worktrees.
     commands = {
         "create": cmd_create,
         "teardown": cmd_teardown,
+        "land": cmd_land,
         "list": cmd_list,
         "init": cmd_init,
     }
