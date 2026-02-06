@@ -176,6 +176,7 @@
 
           # Development workflow
           worktree = mkApp "worktree";
+          wt = mkApp "wt";
 
           # Proxy and diagnostics
           proxy-setup = mkApp "proxy-setup";

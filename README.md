@@ -127,7 +127,30 @@ my-toolkit torrent-cleanup 1
 - **[`find-subtitles`](./python_scripts/find-subtitles.py)**: Finds and downloads subtitles for video files in multiple languages
 - **[`book-downloader`](./python_scripts/book-downloader.py)**: Downloads e-books from various sources
 - **[`txt-to-docx`](./python_scripts/txt-to-docx.py)**: Converts text files to DOCX format
-- **[`worktree`](./python_scripts/worktree.py)**: Manage git worktrees interactively or scriptably (create, teardown, list)
+- **[`worktree`](./python_scripts/worktree.py)**: Manage git worktrees (create, teardown, land, list)
+- **[`wt`](./python_scripts/wt.py)**: Quick worktree launcher with progressive prompting
+
+#### Quick Worktree Launcher
+
+Start working on any project from anywhere with `wt`:
+
+```bash
+# First time: configure your code directories
+wt config add-dir ~/code
+wt config add-dir ~/projects
+
+# Then from anywhere:
+wt                        # Interactive: pick project, enter branch
+wt bitcoin feature-x      # Direct: create worktree immediately
+wt btc feature-x          # Use aliases for speed
+wt --last bugfix          # Reuse last project
+```
+
+Features:
+- **Progressive prompting**: Only prompts for what you don't provide
+- **Project discovery**: Auto-finds git repos in configured directories
+- **Aliases**: Create shortcuts like `btc` → `bitcoin`
+- **fzf integration**: Fast fuzzy project selection
 
 ### Systemd Services
 

@@ -281,6 +281,77 @@ response = requests.get(
 
 ---
 
+### 🌳 Quick Worktree Launcher
+
+#### [wt.py](./wt.py)
+
+Fast worktree creation with progressive prompting. Start working on any project from anywhere.
+
+Dependencies:
+- fzf (optional, for fuzzy project selection)
+- git
+
+**First-time setup:**
+```bash
+# Add directories containing your git repositories
+wt config add-dir ~/code
+wt config add-dir ~/projects
+
+# Create aliases for frequently used projects
+wt config alias btc bitcoin
+wt config alias tk my-toolkit
+```
+
+**Usage:**
+```bash
+# Full interactive mode - prompts for everything
+wt
+
+# Partial - specify project, prompt for branch
+wt bitcoin
+
+# Direct - no prompts, create immediately
+wt bitcoin feature-x
+
+# Using aliases
+wt btc feature-x
+
+# Reuse last project
+wt --last feature-x
+wt -l bugfix
+
+# Specify base branch
+wt bitcoin feature-x --base develop
+```
+
+**Configuration commands:**
+```bash
+wt config                       # Show current configuration
+wt config add-dir ~/code        # Add code directory to scan
+wt config rm-dir ~/code         # Remove code directory
+wt config alias btc bitcoin     # Create shortcut alias
+wt config rm-alias btc          # Remove alias
+```
+
+**List worktrees across all projects:**
+```bash
+wt list
+```
+
+**Features:**
+- **Progressive prompting**: Only asks for what you don't provide
+- **Project auto-discovery**: Scans configured directories for git repos
+- **Fuzzy selection**: Uses fzf when available (falls back to numbered menu)
+- **Aliases**: Create shortcuts for frequently used projects
+- **Last project memory**: `--last` flag reuses the previous project
+- **Partial matching**: `wt bit` finds `bitcoin`
+
+**Config file:** `~/.config/my-toolkit/wt.json`
+
+Note: This is a frontend for [`worktree.py`](./worktree.py) - use that directly for more advanced operations like `land` and `teardown`.
+
+---
+
 ## Scripts
 
 ### [book_downloader.py](./book-downloader.py)

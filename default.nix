@@ -11,6 +11,7 @@ let
     cacert # SSL certificates for HTTPS requests
     git # for worktree.py
     wl-clipboard # for worktree.py clipboard support
+    fzf # for wt.py interactive project picker
     squid # for residential-proxy service (marked insecure, to be replaced later)
     # Add other dependencies your scripts need
   ];
@@ -158,6 +159,20 @@ pkgs.stdenv.mkDerivation {
 
     # Copy Python scripts
     cp ${./python_scripts}/*.py $out/lib/python-scripts/
+
+    # Create standalone wrappers for Python scripts
+    for file in ${./python_scripts}/*.py; do
+      script_name=$(basename $file .py)
+      # Skip internal modules (like toolkit_utils)
+      if [[ "$script_name" != "toolkit_utils" ]]; then
+        cat > $out/bin/$script_name << EOF
+#!/bin/sh
+exec ${pythonEnv}/bin/python3 $out/lib/python-scripts/$script_name.py "\$@"
+EOF
+        chmod +x $out/bin/$script_name
+        wrapProgram $out/bin/$script_name --prefix PATH : ${pkgs.lib.makeBinPath dependencies}
+      fi
+    done
 
     # Install my-toolkit command
     cp ${mytoolkit}/bin/my-toolkit $out/bin/
