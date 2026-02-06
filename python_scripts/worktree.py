@@ -192,14 +192,14 @@ def cmd_create(args):
         "copied_files": copied_files,
     }
 
-    # Copy worktree path to clipboard
+    # Copy worktree path to clipboard (with timeout to avoid hanging)
     clipboard_ok = False
     for clip_cmd in [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]:
         try:
-            subprocess.run(clip_cmd, input=str(worktree_path), text=True, capture_output=True, check=True)
+            subprocess.run(clip_cmd, input=str(worktree_path), text=True, capture_output=True, check=True, timeout=2)
             clipboard_ok = True
             break
-        except (FileNotFoundError, subprocess.CalledProcessError):
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
             continue
 
     if args.json:
