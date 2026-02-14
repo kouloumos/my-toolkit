@@ -162,11 +162,18 @@ main() {
         exit 1
     fi
 
-    # Check if torrent file exists (if it's not a magnet link)
-    if [ ! "${torrent#magnet:}" != "$torrent" ] && [ ! -f "$torrent" ]; then
-        echo "Error: Torrent file not found: $torrent"
-        exit 1
-    fi
+    # Check if torrent file exists (skip check for magnet links and URLs)
+    case "$torrent" in
+        magnet:*|http://*|https://*)
+            # Magnet links and URLs are handled by transmission-cli directly
+            ;;
+        *)
+            if [ ! -f "$torrent" ]; then
+                echo "Error: Torrent file not found: $torrent"
+                exit 1
+            fi
+            ;;
+    esac
 
     # Check dependencies
     check_dependencies

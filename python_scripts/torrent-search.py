@@ -65,6 +65,18 @@ class Config:
     # Timeout for API requests (seconds)
     REQUEST_TIMEOUT = 10
 
+    # BitTorrent trackers for magnet link construction
+    TRACKERS = [
+        "udp://open.demonii.com:1337/announce",
+        "udp://tracker.openbittorrent.com:80",
+        "udp://tracker.coppersurfer.tk:6969",
+        "udp://glotorrents.pw:6969/announce",
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://torrent.gresille.org:80/announce",
+        "udp://p4p.arenabg.com:1337",
+        "udp://tracker.leechers-paradise.org:6969",
+    ]
+
 
 class TorrentCache:
     """Manage torrent cache and metadata"""
@@ -293,9 +305,10 @@ class TorrentSearcher:
         Returns:
             True if download initiated successfully
         """
-        magnet_url = torrent.get("url")
-        if not magnet_url:
-            print("Error: No magnet URL found")
+        # Construct magnet link from torrent hash (more reliable than .torrent URLs)
+        torrent_hash = torrent.get("hash")
+        if not torrent_hash:
+            print("Error: No torrent hash found")
             return False
 
         # Get movie directory name (sanitize title)
@@ -304,6 +317,11 @@ class TorrentSearcher:
         year = movie.get("year", "")
         movie_dir_name = f"{cache_id}-{title}-{year}"
         movie_dir = Path(watch_dir) / movie_dir_name
+
+        # Build magnet link from hash
+        from urllib.parse import quote
+        trackers = "&".join(f"tr={quote(t)}" for t in self.config.TRACKERS)
+        magnet_url = f"magnet:?xt=urn:btih:{torrent_hash}&dn={quote(title)}&{trackers}"
 
         print(f"\nDownloading: {title} ({year}) - {torrent.get('quality', 'Unknown')}")
         print(f"Size: {torrent.get('size', 'Unknown')}")
