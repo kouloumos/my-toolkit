@@ -15,8 +15,8 @@ from typing import Dict
 class Config:
     """Centralized configuration for torrent manager"""
 
-    CACHE_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
-    METADATA_FILE = CACHE_DIR / "metadata.json"
+    METADATA_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
+    METADATA_FILE = METADATA_DIR / "metadata.json"
 
 
 class TorrentLister:
@@ -59,13 +59,15 @@ class TorrentLister:
         except:
             return timestamp
 
-    def get_directory_size(self, directory: Path) -> str:
-        """Get total size of directory"""
-        if not directory.exists():
+    def get_path_size(self, path: Path) -> str:
+        """Get total size of a file or directory"""
+        if not path.exists():
             return "N/A"
 
         try:
-            total_size = sum(f.stat().st_size for f in directory.rglob('*') if f.is_file())
+            if path.is_file():
+                return self.format_size(path.stat().st_size)
+            total_size = sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
             return self.format_size(total_size)
         except Exception:
             return "N/A"
@@ -102,38 +104,43 @@ class TorrentLister:
             year = movie.get("year", "Unknown")
             quality = movie.get("quality", "Unknown")
             size = movie.get("size", "Unknown")
+            status = movie.get("status", "unknown")
             downloaded_at = movie.get("downloaded_at", "Unknown")
             time_ago = self.format_time_ago(downloaded_at)
 
-            print(f"\n[{cache_id}] {title} ({year})")
+            status_label = " [DOWNLOADING]" if status == "downloading" else ""
+            print(f"\n[{cache_id}] {title} ({year}){status_label}")
             print(f"    Quality: {quality} | Size: {size} | Downloaded: {time_ago}")
 
             if verbose:
                 rating = movie.get("rating", "N/A")
                 genres = ", ".join(movie.get("genres", []))
-                directory = movie.get("directory", "Unknown")
-                full_path = self.config.CACHE_DIR / directory
+                movie_path = Path(movie.get("path", ""))
 
                 print(f"    Rating: {rating}/10 | Genres: {genres}")
-                print(f"    Location: {full_path}")
+                print(f"    Location: {movie_path or 'N/A'}")
 
-                # Check if directory still exists
-                if full_path.exists():
-                    actual_size = self.get_directory_size(full_path)
+                if movie_path and movie_path.exists():
+                    actual_size = self.get_path_size(movie_path)
                     print(f"    Actual size: {actual_size}")
 
-                    # List video files
+                    # Find video files (handle both file and directory paths)
                     video_extensions = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
-                    video_files = [f for f in full_path.rglob('*') if f.suffix.lower() in video_extensions]
-
-                    if video_files:
-                        print(f"    Video files: {len(video_files)}")
-                        for video_file in video_files[:3]:  # Show first 3
-                            print(f"      - {video_file.name}")
-                        if len(video_files) > 3:
-                            print(f"      ... and {len(video_files) - 3} more")
-                else:
-                    print(f"    ⚠ Directory not found (may have been deleted)")
+                    if movie_path.is_file():
+                        if movie_path.suffix.lower() in video_extensions:
+                            print(f"    Video file: {movie_path.name}")
+                    else:
+                        video_files = [f for f in movie_path.rglob('*') if f.suffix.lower() in video_extensions]
+                        if video_files:
+                            print(f"    Video files: {len(video_files)}")
+                            for video_file in video_files[:3]:
+                                print(f"      - {video_file.name}")
+                            if len(video_files) > 3:
+                                print(f"      ... and {len(video_files) - 3} more")
+                elif movie_path:
+                    print(f"    Path not found (may have been deleted)")
+                elif status == "downloading":
+                    print(f"    Download in progress or interrupted")
 
         print("\n" + "=" * 80)
         print(f"\nCommands:")

@@ -15,8 +15,8 @@ from typing import Dict, List
 class Config:
     """Centralized configuration for torrent manager"""
 
-    CACHE_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
-    METADATA_FILE = CACHE_DIR / "metadata.json"
+    METADATA_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
+    METADATA_FILE = METADATA_DIR / "metadata.json"
 
 
 class TorrentCleaner:
@@ -74,20 +74,25 @@ class TorrentCleaner:
 
         title = movie.get("title", "Unknown")
         year = movie.get("year", "Unknown")
-        directory_name = movie.get("directory", "")
+        movie_path_str = movie.get("path", "")
+        movie_path = Path(movie_path_str) if movie_path_str else None
 
         print(f"\nMovie to remove:")
         print(f"  [{cache_id}] {title} ({year})")
         print(f"  Quality: {movie.get('quality', 'Unknown')}")
         print(f"  Size: {movie.get('size', 'Unknown')}")
 
-        # Check if directory exists
-        movie_dir = self.config.CACHE_DIR / directory_name if directory_name else None
-        if movie_dir and movie_dir.exists():
-            # Calculate actual size
-            total_size = sum(f.stat().st_size for f in movie_dir.rglob('*') if f.is_file())
+        # Check if path exists and show disk usage
+        if movie_path and movie_path.exists():
+            if movie_path.is_file():
+                total_size = movie_path.stat().st_size
+            else:
+                total_size = sum(f.stat().st_size for f in movie_path.rglob('*') if f.is_file())
             size_gb = total_size / (1024 ** 3)
+            print(f"  Location: {movie_path}")
             print(f"  Disk space to free: {size_gb:.2f} GB")
+        elif movie_path_str:
+            print(f"  Location: {movie_path_str} (not found)")
 
         # Confirm deletion
         if not force:
@@ -101,14 +106,16 @@ class TorrentCleaner:
                 print("\nCancelled")
                 return False
 
-        # Remove directory
-        if movie_dir and movie_dir.exists():
+        # Remove files
+        if movie_path and movie_path.exists():
             try:
-                shutil.rmtree(movie_dir)
-                print(f"✓ Removed directory: {movie_dir}")
+                if movie_path.is_file():
+                    movie_path.unlink()
+                else:
+                    shutil.rmtree(movie_path)
+                print(f"Removed: {movie_path}")
             except Exception as e:
-                print(f"Error removing directory: {e}")
-                # Continue anyway to clean metadata
+                print(f"Error removing {movie_path}: {e}")
 
         # Remove from metadata
         movies.pop(movie_idx)
@@ -140,12 +147,14 @@ class TorrentCleaner:
         # Calculate total size
         total_size = 0
         for movie in movies:
-            directory_name = movie.get("directory", "")
-            if directory_name:
-                movie_dir = self.config.CACHE_DIR / directory_name
-                if movie_dir.exists():
-                    size = sum(f.stat().st_size for f in movie_dir.rglob('*') if f.is_file())
-                    total_size += size
+            movie_path_str = movie.get("path", "")
+            if movie_path_str:
+                movie_path = Path(movie_path_str)
+                if movie_path.exists():
+                    if movie_path.is_file():
+                        total_size += movie_path.stat().st_size
+                    else:
+                        total_size += sum(f.stat().st_size for f in movie_path.rglob('*') if f.is_file())
 
         if total_size > 0:
             size_gb = total_size / (1024 ** 3)
@@ -163,78 +172,27 @@ class TorrentCleaner:
                 print("\nCancelled")
                 return 0
 
-        # Remove all directories
+        # Remove all files/directories
         removed_count = 0
         for movie in movies:
-            directory_name = movie.get("directory", "")
-            if directory_name:
-                movie_dir = self.config.CACHE_DIR / directory_name
-                if movie_dir.exists():
+            movie_path_str = movie.get("path", "")
+            if movie_path_str:
+                movie_path = Path(movie_path_str)
+                if movie_path.exists():
                     try:
-                        shutil.rmtree(movie_dir)
+                        if movie_path.is_file():
+                            movie_path.unlink()
+                        else:
+                            shutil.rmtree(movie_path)
                         removed_count += 1
                     except Exception as e:
-                        print(f"Error removing {movie_dir}: {e}")
+                        print(f"Error removing {movie_path}: {e}")
 
         # Clear metadata
         metadata["movies"] = []
         self.save_metadata(metadata)
 
-        print(f"\n✓ Removed {removed_count} movie(s)")
-        return removed_count
-
-    def cleanup_orphans(self) -> int:
-        """
-        Remove directories that don't have metadata entries
-
-        Returns:
-            Number of orphaned directories removed
-        """
-        if not self.config.CACHE_DIR.exists():
-            print("Cache directory doesn't exist")
-            return 0
-
-        metadata = self.load_metadata()
-        movies = metadata.get("movies", [])
-
-        # Get all valid directory names from metadata
-        valid_dirs = {movie.get("directory") for movie in movies if movie.get("directory")}
-
-        # Find all directories in cache
-        cache_dirs = [d for d in self.config.CACHE_DIR.iterdir() if d.is_dir()]
-
-        # Find orphans
-        orphans = [d for d in cache_dirs if d.name not in valid_dirs]
-
-        if not orphans:
-            print("No orphaned directories found")
-            return 0
-
-        print(f"\nFound {len(orphans)} orphaned director(y/ies):")
-        for orphan in orphans:
-            size = sum(f.stat().st_size for f in orphan.rglob('*') if f.is_file())
-            size_gb = size / (1024 ** 3)
-            print(f"  - {orphan.name} ({size_gb:.2f} GB)")
-
-        try:
-            print("\nRemove orphaned directories? [y/N]: ", end="")
-            confirm = input().strip().lower()
-            if confirm not in ['y', 'yes']:
-                print("Cancelled")
-                return 0
-        except KeyboardInterrupt:
-            print("\nCancelled")
-            return 0
-
-        removed_count = 0
-        for orphan in orphans:
-            try:
-                shutil.rmtree(orphan)
-                removed_count += 1
-                print(f"✓ Removed {orphan.name}")
-            except Exception as e:
-                print(f"Error removing {orphan.name}: {e}")
-
+        print(f"\nRemoved {removed_count} movie(s)")
         return removed_count
 
 
@@ -246,13 +204,11 @@ def main():
 Examples:
   torrent-cleanup.py 1              # Remove movie with ID 1
   torrent-cleanup.py --all          # Remove all movies
-  torrent-cleanup.py --orphans      # Clean up orphaned directories
   torrent-cleanup.py -f 2           # Force remove without confirmation
 
 Cleanup operations:
-  - Remove movie by ID: Deletes the movie directory and removes metadata
+  - Remove movie by ID: Deletes the movie files and removes metadata
   - Remove all: Clears entire cache
-  - Remove orphans: Cleans up directories without metadata entries
         """
     )
 
@@ -270,12 +226,6 @@ Cleanup operations:
     )
 
     parser.add_argument(
-        "-o", "--orphans",
-        action="store_true",
-        help="Remove orphaned directories (directories without metadata)"
-    )
-
-    parser.add_argument(
         "-f", "--force",
         action="store_true",
         help="Skip confirmation prompt"
@@ -289,8 +239,6 @@ Cleanup operations:
     # Determine action
     if args.all:
         cleaner.cleanup_all(force=args.force)
-    elif args.orphans:
-        cleaner.cleanup_orphans()
     elif args.cache_id is not None:
         cleaner.remove_movie(args.cache_id, force=args.force)
     else:

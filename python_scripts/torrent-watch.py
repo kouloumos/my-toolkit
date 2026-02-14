@@ -16,8 +16,8 @@ from typing import Dict, Optional, List
 class Config:
     """Centralized configuration for torrent manager"""
 
-    CACHE_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
-    METADATA_FILE = CACHE_DIR / "metadata.json"
+    METADATA_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
+    METADATA_FILE = METADATA_DIR / "metadata.json"
 
     # Video file extensions
     VIDEO_EXTENSIONS = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v'}
@@ -186,21 +186,35 @@ class TorrentWatcher:
             print(f"Use 'my-toolkit torrent-list' to see available movies")
             sys.exit(1)
 
-        # Get movie directory
-        directory_name = movie.get("directory")
-        if not directory_name:
-            print(f"Error: Movie directory not found in metadata")
+        # Check download status
+        status = movie.get("status", "downloaded")
+        if status == "downloading":
+            print(f"Error: Movie '{movie.get('title', 'Unknown')}' is still downloading or download was interrupted")
+            print(f"If the download was interrupted, re-run the search to download again.")
             sys.exit(1)
 
-        movie_dir = self.config.CACHE_DIR / directory_name
-
-        if not movie_dir.exists():
-            print(f"Error: Movie directory not found: {movie_dir}")
-            print(f"The movie may have been deleted.")
+        # Get movie path
+        movie_path_str = movie.get("path", "")
+        if not movie_path_str:
+            print(f"Error: No download path recorded for this movie")
             sys.exit(1)
 
-        # Find video files
-        video_files = self.find_video_files(movie_dir)
+        movie_path = Path(movie_path_str)
+
+        if not movie_path.exists():
+            print(f"Error: Path not found: {movie_path}")
+            print(f"The movie files may have been deleted.")
+            sys.exit(1)
+
+        # Handle single-file torrents (path is a file, not directory)
+        if movie_path.is_file():
+            if movie_path.suffix.lower() in self.config.VIDEO_EXTENSIONS:
+                video_files = [movie_path]
+            else:
+                print(f"Error: Path is a file but not a video: {movie_path}")
+                sys.exit(1)
+        else:
+            video_files = self.find_video_files(movie_path)
 
         if not video_files:
             print(f"Error: No video files found in {movie_dir}")

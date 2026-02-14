@@ -45,6 +45,31 @@ find_video_files() {
     find "$dir" -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.webm" \) 2>/dev/null
 }
 
+snapshot_directory() {
+    local dir="$1"
+    # List top-level entries (files and dirs) sorted, one per line
+    if [ -d "$dir" ]; then
+        ls -1 "$dir" 2>/dev/null
+    fi
+}
+
+detect_new_entry() {
+    local dir="$1"
+    local before_snapshot="$2"
+    local after_snapshot
+    after_snapshot=$(snapshot_directory "$dir")
+
+    # Find entries in after that aren't in before
+    local new_entry=""
+    echo "$after_snapshot" | while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+        if ! echo "$before_snapshot" | grep -qxF "$entry"; then
+            echo "$entry"
+            return
+        fi
+    done
+}
+
 download_torrent() {
     local torrent="$1"
     local download_dir="$2"
@@ -57,6 +82,10 @@ download_torrent() {
 
     # Create download directory if it doesn't exist
     mkdir -p "$download_dir"
+
+    # Snapshot directory contents before download
+    local before_snapshot
+    before_snapshot=$(snapshot_directory "$download_dir")
 
     # Build transmission-cli command
     local cmd="transmission-cli"
@@ -72,6 +101,18 @@ download_torrent() {
     if eval "$cmd"; then
         echo ""
         echo "Download completed successfully!"
+
+        # Detect what transmission created
+        local new_entry
+        new_entry=$(detect_new_entry "$download_dir" "$before_snapshot")
+
+        if [ -n "$new_entry" ]; then
+            echo "TORRENT_DOWNLOAD_PATH=$download_dir/$new_entry"
+        else
+            # Fallback: no new entry detected (maybe it already existed)
+            echo "TORRENT_DOWNLOAD_PATH=$download_dir"
+        fi
+
         return 0
     else
         echo ""
@@ -178,11 +219,21 @@ main() {
     # Check dependencies
     check_dependencies
 
-    # Download torrent
-    if download_torrent "$torrent" "$download_dir" "$watch"; then
-        # Automatically find subtitles if enabled
+    # Download torrent - capture output to extract actual path
+    local download_output
+    download_output=$(download_torrent "$torrent" "$download_dir" "$watch" 2>&1 | tee /dev/stderr)
+    local download_exit=$?
+
+    if [ $download_exit -eq 0 ]; then
+        # Extract actual download path from output
+        local actual_path
+        actual_path=$(echo "$download_output" | grep "^TORRENT_DOWNLOAD_PATH=" | tail -1 | cut -d= -f2-)
+
+        # Use actual path for subtitles if available, otherwise fall back to download_dir
+        local subtitle_search_dir="${actual_path:-$download_dir}"
+
         if [ "$auto_subs" = "true" ]; then
-            auto_find_subtitles "$download_dir"
+            auto_find_subtitles "$subtitle_search_dir"
         fi
         exit 0
     else

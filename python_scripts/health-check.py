@@ -202,8 +202,7 @@ class HealthCheck:
 
     def check_torrent_cache(self) -> str:
         """Check torrent cache status"""
-        cache_dir = Path.home() / ".cache" / "my-toolkit" / "torrents"
-        metadata_file = cache_dir / "metadata.json"
+        metadata_file = Path.home() / ".cache" / "my-toolkit" / "torrents" / "metadata.json"
 
         if not metadata_file.exists():
             return "Empty (no downloads yet)"
@@ -212,10 +211,31 @@ class HealthCheck:
             with open(metadata_file, 'r') as f:
                 data = json.load(f)
                 movies = data.get("movies", [])
-                if movies:
-                    return f"{len(movies)} movie(s) cached"
-                else:
+                if not movies:
                     return "Empty"
+
+                valid = 0
+                invalid = 0
+                downloading = 0
+                for movie in movies:
+                    status = movie.get("status", "downloaded")
+                    if status == "downloading":
+                        downloading += 1
+                    else:
+                        movie_path = movie.get("path", "")
+                        if movie_path and Path(movie_path).exists():
+                            valid += 1
+                        else:
+                            invalid += 1
+
+                parts = [f"{len(movies)} movie(s)"]
+                if valid:
+                    parts.append(f"{valid} valid")
+                if invalid:
+                    parts.append(f"{invalid} missing")
+                if downloading:
+                    parts.append(f"{downloading} downloading")
+                return ", ".join(parts)
         except Exception:
             return "Metadata corrupted"
 

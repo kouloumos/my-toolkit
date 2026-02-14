@@ -44,11 +44,14 @@ SSL_CONFIG = SSLConfig()
 class Config:
     """Centralized configuration for torrent manager"""
 
-    # Cache directory for torrent downloads
-    CACHE_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
+    # Default download directory for torrents
+    DEFAULT_DOWNLOAD_DIR = Path(os.environ.get("TORRENT_DOWNLOAD_DIR", str(Path.home() / "Downloads" / "torrents")))
+
+    # Metadata directory (index only, not storage)
+    METADATA_DIR = Path.home() / ".cache" / "my-toolkit" / "torrents"
 
     # Metadata file to track downloads
-    METADATA_FILE = CACHE_DIR / "metadata.json"
+    METADATA_FILE = METADATA_DIR / "metadata.json"
 
     # YTS API mirrors (try in order if one is blocked)
     # Note: Your ISP may block some of these domains
@@ -79,23 +82,50 @@ class Config:
 
 
 class TorrentCache:
-    """Manage torrent cache and metadata"""
+    """Manage torrent metadata index"""
 
     def __init__(self, config: Config):
         self.config = config
-        self.config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self.config.METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
     def load_metadata(self) -> Dict:
-        """Load metadata from disk"""
+        """Load metadata from disk, auto-migrating old format"""
         if not self.config.METADATA_FILE.exists():
             return {"movies": []}
 
         try:
             with open(self.config.METADATA_FILE, 'r') as f:
-                return json.load(f)
+                metadata = json.load(f)
         except Exception as e:
             print(f"Warning: Failed to load metadata: {e}")
             return {"movies": []}
+
+        # Auto-migrate old "directory" field to new "path" field
+        migrated = False
+        for movie in metadata.get("movies", []):
+            if "directory" in movie and "path" not in movie:
+                old_dir = movie.pop("directory")
+                # Best-effort: reconstruct absolute path from old cache dir layout
+                old_path = self.config.METADATA_DIR / old_dir
+                if old_path.exists():
+                    movie["path"] = str(old_path)
+                else:
+                    movie["path"] = ""
+                if "status" not in movie:
+                    movie["status"] = "downloaded" if movie["path"] else "downloading"
+                migrated = True
+            elif "directory" in movie:
+                # Both exist (shouldn't happen), drop old field
+                movie.pop("directory")
+                migrated = True
+            if "status" not in movie:
+                movie["status"] = "downloaded"
+                migrated = True
+
+        if migrated:
+            self.save_metadata(metadata)
+
+        return metadata
 
     def save_metadata(self, metadata: Dict):
         """Save metadata to disk"""
@@ -106,7 +136,7 @@ class TorrentCache:
             print(f"Error: Failed to save metadata: {e}")
 
     def add_movie(self, movie_info: Dict):
-        """Add a movie to the cache metadata"""
+        """Add a movie to the metadata index"""
         metadata = self.load_metadata()
 
         # Check if movie already exists
@@ -120,6 +150,17 @@ class TorrentCache:
 
         metadata["movies"].append(movie_info)
         self.save_metadata(metadata)
+
+    def update_movie_path(self, cache_id: int, path: str):
+        """Update the download path and status for a movie"""
+        metadata = self.load_metadata()
+        for movie in metadata.get("movies", []):
+            if movie.get("cache_id") == cache_id:
+                movie["path"] = path
+                movie["status"] = "downloaded"
+                self.save_metadata(metadata)
+                return
+        print(f"Warning: Movie with cache_id {cache_id} not found in metadata")
 
     def get_next_id(self) -> int:
         """Get next available movie ID for cache"""
@@ -293,14 +334,13 @@ class TorrentSearcher:
         # Fallback: return first torrent (highest seeded)
         return torrents[0]
 
-    def download_torrent(self, movie: Dict, torrent: Dict, watch_dir: str) -> bool:
+    def download_torrent(self, movie: Dict, torrent: Dict) -> bool:
         """
         Download torrent using download-torrent.sh
 
         Args:
             movie: Movie metadata
             torrent: Torrent metadata
-            watch_dir: Directory to download to
 
         Returns:
             True if download initiated successfully
@@ -311,12 +351,10 @@ class TorrentSearcher:
             print("Error: No torrent hash found")
             return False
 
-        # Get movie directory name (sanitize title)
         cache_id = self.cache.get_next_id()
         title = movie.get("title", "Unknown").replace("/", "-")
         year = movie.get("year", "")
-        movie_dir_name = f"{cache_id}-{title}-{year}"
-        movie_dir = Path(watch_dir) / movie_dir_name
+        download_dir = self.config.DEFAULT_DOWNLOAD_DIR
 
         # Build magnet link from hash
         from urllib.parse import quote
@@ -326,7 +364,7 @@ class TorrentSearcher:
         print(f"\nDownloading: {title} ({year}) - {torrent.get('quality', 'Unknown')}")
         print(f"Size: {torrent.get('size', 'Unknown')}")
         print(f"Seeds: {torrent.get('seeds', 0)} | Peers: {torrent.get('peers', 0)}")
-        print(f"Download directory: {movie_dir}")
+        print(f"Download directory: {download_dir}")
         print("")
 
         # Save metadata before starting download (download is blocking and may be interrupted)
@@ -339,40 +377,61 @@ class TorrentSearcher:
             "size": torrent.get("size", "Unknown"),
             "rating": movie.get("rating", "N/A"),
             "genres": movie.get("genres", []),
-            "directory": movie_dir_name,
+            "path": "",
+            "status": "downloading",
             "magnet_url": magnet_url,
         }
         self.cache.add_movie(movie_info)
         print(f"Movie added to cache with ID: {cache_id}")
 
-        # Call download-torrent.sh
+        # Call download-torrent.sh, streaming output line-by-line
+        # to preserve transmission progress and capture TORRENT_DOWNLOAD_PATH
         try:
-            import os
             if os.environ.get("MY_TOOLKIT_DEV_MODE") == "1":
                 cmd = [
                     "./shell_scripts/download-torrent.sh",
                     "--no-subtitles",
-                    "-d", str(movie_dir),
+                    "-d", str(download_dir),
                     magnet_url
                 ]
             else:
                 cmd = [
                     "my-toolkit", "download-torrent",
                     "--no-subtitles",
-                    "-d", str(movie_dir),
+                    "-d", str(download_dir),
                     magnet_url
                 ]
 
-            result = subprocess.run(cmd)
+            actual_path = ""
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
 
-            if result.returncode == 0:
-                print(f"\nDownload completed!")
+            for line in process.stdout:
+                line = line.rstrip("\n")
+                if line.startswith("TORRENT_DOWNLOAD_PATH="):
+                    actual_path = line.split("=", 1)[1]
+                else:
+                    print(line)
+
+            process.wait()
+
+            if process.returncode == 0:
+                if actual_path:
+                    self.cache.update_movie_path(cache_id, actual_path)
+                    print(f"\nDownload completed! Path: {actual_path}")
+                else:
+                    # Fallback: no path detected, mark as downloaded with download_dir
+                    self.cache.update_movie_path(cache_id, str(download_dir))
+                    print(f"\nDownload completed!")
                 print(f"Use 'my-toolkit torrent-watch {cache_id}' to play")
                 return True
             else:
-                print(f"\nDownload exited with code {result.returncode}")
-                print(f"Movie is still in cache (ID: {cache_id})")
-                print(f"Files may be in: {movie_dir}")
+                print(f"\nDownload exited with code {process.returncode}")
+                print(f"Movie is still in cache (ID: {cache_id}, status: downloading)")
                 return False
 
         except Exception as e:
@@ -410,7 +469,7 @@ class TorrentSearcher:
             movie = movies[0]
             torrent = self.select_torrent(movie, quality)
             if torrent:
-                self.download_torrent(movie, torrent, str(self.config.CACHE_DIR))
+                self.download_torrent(movie, torrent)
             return
 
         # Interactive selection
@@ -449,7 +508,7 @@ class TorrentSearcher:
                 torrent = self.select_torrent(movie, quality)
 
             if torrent:
-                self.download_torrent(movie, torrent, str(self.config.CACHE_DIR))
+                self.download_torrent(movie, torrent)
 
         except (ValueError, IndexError):
             print("Invalid input")
