@@ -161,14 +161,10 @@
             ''}";
           };
         in {
-          # Torrent management commands
-          torrent-search = mkApp "torrent-search";
-          torrent-list = mkApp "torrent-list";
-          torrent-watch = mkApp "torrent-watch";
-          torrent-cleanup = mkApp "torrent-cleanup";
+          # Torrent management (unified command)
+          torrent = mkApp "torrent";
 
           # Utility commands
-          download-torrent = mkApp "download-torrent";
           find-subtitles = mkApp "find-subtitles";
           video2gif = mkApp "video2gif";
           upload-to-remarkable = mkApp "upload-to-remarkable";

@@ -133,9 +133,9 @@ class TestScriptAvailability(unittest.TestCase):
         """Set up test fixtures"""
         cls.script_dir = Path(__file__).parent.parent / "python_scripts"
 
-    def test_torrent_search_exists(self):
-        """Test torrent-search.py exists"""
-        script = self.script_dir / "torrent-search.py"
+    def test_torrent_exists(self):
+        """Test torrent.py exists"""
+        script = self.script_dir / "torrent.py"
         self.assertTrue(script.exists(), f"Script should exist: {script}")
 
     def test_proxy_setup_exists(self):
@@ -191,9 +191,9 @@ class TestScriptHelp(unittest.TestCase):
         """Test health-check.py provides help"""
         self._test_help("health-check.py")
 
-    def test_torrent_search_help(self):
-        """Test torrent-search.py provides help"""
-        self._test_help("torrent-search.py")
+    def test_torrent_help(self):
+        """Test torrent.py provides help"""
+        self._test_help("torrent.py")
 
 
 class TestDependencies(unittest.TestCase):
@@ -261,7 +261,7 @@ class TestTorrentCache(unittest.TestCase):
             sys.modules['requests'] = MagicMock()
 
         from importlib import import_module
-        mod = import_module("torrent-search")
+        mod = import_module("torrent")
         self.TorrentCache = mod.TorrentCache
         self.Config = mod.Config
 
