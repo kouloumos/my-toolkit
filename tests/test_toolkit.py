@@ -16,6 +16,7 @@ Tests are organized into categories:
 """
 
 import unittest
+import tempfile
 import sys
 import os
 from pathlib import Path
@@ -246,6 +247,203 @@ class TestIntegration(unittest.TestCase):
             self.fail(f"Error reading proxy configuration: {e}")
 
 
+class TestTorrentCache(unittest.TestCase):
+    """Test torrent cache metadata logic"""
+
+    def setUp(self):
+        """Create a temporary directory for each test"""
+        self.tmpdir = tempfile.mkdtemp()
+        self.metadata_dir = Path(self.tmpdir) / "torrents"
+
+        # Ensure 'requests' is available as a mock so torrent-search.py can import
+        if 'requests' not in sys.modules:
+            from unittest.mock import MagicMock
+            sys.modules['requests'] = MagicMock()
+
+        from importlib import import_module
+        mod = import_module("torrent-search")
+        self.TorrentCache = mod.TorrentCache
+        self.Config = mod.Config
+
+        # Patch Config to use temp directory
+        self.config = self.Config()
+        self.config.METADATA_DIR = self.metadata_dir
+        self.config.METADATA_FILE = self.metadata_dir / "metadata.json"
+
+        self.cache = self.TorrentCache(self.config)
+
+    def tearDown(self):
+        """Clean up temporary directory"""
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def _write_metadata(self, data):
+        """Helper to write raw metadata JSON"""
+        with open(self.config.METADATA_FILE, 'w') as f:
+            json.dump(data, f)
+
+    def _read_metadata(self):
+        """Helper to read raw metadata JSON from disk"""
+        with open(self.config.METADATA_FILE, 'r') as f:
+            return json.load(f)
+
+    # --- get_next_id ---
+
+    def test_get_next_id_empty(self):
+        """First ID should be 1 when cache is empty"""
+        self.assertEqual(self.cache.get_next_id(), 1)
+
+    def test_get_next_id_increments(self):
+        """Next ID should be max(existing) + 1"""
+        self._write_metadata({"movies": [
+            {"cache_id": 1, "id": 100, "title": "A"},
+            {"cache_id": 3, "id": 200, "title": "B"},
+        ]})
+        self.assertEqual(self.cache.get_next_id(), 4)
+
+    # --- add_movie ---
+
+    def test_add_movie(self):
+        """Adding a movie should persist to metadata file"""
+        self.cache.add_movie({
+            "cache_id": 1, "id": 42, "title": "Test Movie",
+            "path": "/tmp/test", "status": "downloading",
+        })
+        data = self._read_metadata()
+        self.assertEqual(len(data["movies"]), 1)
+        self.assertEqual(data["movies"][0]["title"], "Test Movie")
+        self.assertIn("downloaded_at", data["movies"][0])
+
+    def test_add_movie_duplicate_skipped(self):
+        """Adding a movie with the same YTS id should be a no-op"""
+        self.cache.add_movie({"cache_id": 1, "id": 42, "title": "First"})
+        self.cache.add_movie({"cache_id": 2, "id": 42, "title": "Duplicate"})
+        data = self._read_metadata()
+        self.assertEqual(len(data["movies"]), 1)
+        self.assertEqual(data["movies"][0]["title"], "First")
+
+    # --- update_movie_path ---
+
+    def test_update_movie_path(self):
+        """update_movie_path should set path and status to downloaded"""
+        self.cache.add_movie({
+            "cache_id": 1, "id": 42, "title": "Test",
+            "path": "", "status": "downloading",
+        })
+        self.cache.update_movie_path(1, "/downloads/Movie.2022")
+        data = self._read_metadata()
+        movie = data["movies"][0]
+        self.assertEqual(movie["path"], "/downloads/Movie.2022")
+        self.assertEqual(movie["status"], "downloaded")
+
+    def test_update_movie_path_nonexistent(self):
+        """update_movie_path with wrong cache_id should not crash"""
+        self.cache.add_movie({
+            "cache_id": 1, "id": 42, "title": "Test",
+            "path": "", "status": "downloading",
+        })
+        # Should print warning but not raise
+        self.cache.update_movie_path(999, "/some/path")
+        data = self._read_metadata()
+        # Original movie unchanged
+        self.assertEqual(data["movies"][0]["path"], "")
+        self.assertEqual(data["movies"][0]["status"], "downloading")
+
+    # --- Migration: old "directory" field ---
+
+    def test_migrate_directory_to_path_missing_dir(self):
+        """Old 'directory' field should migrate to empty path when dir doesn't exist"""
+        self._write_metadata({"movies": [{
+            "cache_id": 1, "id": 42, "title": "Old Movie",
+            "directory": "1-Old-Movie-2020",
+        }]})
+        metadata = self.cache.load_metadata()
+        movie = metadata["movies"][0]
+        self.assertNotIn("directory", movie)
+        self.assertEqual(movie["path"], "")
+        self.assertEqual(movie["status"], "downloading")
+
+    def test_migrate_directory_to_path_existing_dir(self):
+        """Old 'directory' field should migrate to abs path when dir exists"""
+        # Create the old-style directory
+        old_dir = self.metadata_dir / "1-Old-Movie-2020"
+        old_dir.mkdir(parents=True)
+
+        self._write_metadata({"movies": [{
+            "cache_id": 1, "id": 42, "title": "Old Movie",
+            "directory": "1-Old-Movie-2020",
+        }]})
+        metadata = self.cache.load_metadata()
+        movie = metadata["movies"][0]
+        self.assertNotIn("directory", movie)
+        self.assertEqual(movie["path"], str(old_dir))
+        self.assertEqual(movie["status"], "downloaded")
+
+    def test_migrate_adds_status_to_existing_path_entries(self):
+        """Entries with 'path' but no 'status' should get status='downloaded'"""
+        self._write_metadata({"movies": [{
+            "cache_id": 1, "id": 42, "title": "Movie",
+            "path": "/some/path",
+        }]})
+        metadata = self.cache.load_metadata()
+        self.assertEqual(metadata["movies"][0]["status"], "downloaded")
+
+    def test_migrate_drops_directory_when_both_exist(self):
+        """If both 'directory' and 'path' exist, drop 'directory'"""
+        self._write_metadata({"movies": [{
+            "cache_id": 1, "id": 42, "title": "Movie",
+            "directory": "old-dir",
+            "path": "/new/path",
+            "status": "downloaded",
+        }]})
+        metadata = self.cache.load_metadata()
+        movie = metadata["movies"][0]
+        self.assertNotIn("directory", movie)
+        self.assertEqual(movie["path"], "/new/path")
+
+    def test_migration_persists_to_disk(self):
+        """Migration should save the updated metadata back to disk"""
+        self._write_metadata({"movies": [{
+            "cache_id": 1, "id": 42, "title": "Movie",
+            "directory": "1-Movie-2020",
+        }]})
+        self.cache.load_metadata()
+        # Read raw file - should have been rewritten
+        raw = self._read_metadata()
+        self.assertNotIn("directory", raw["movies"][0])
+        self.assertIn("path", raw["movies"][0])
+        self.assertIn("status", raw["movies"][0])
+
+    def test_no_migration_no_rewrite(self):
+        """If nothing needs migration, metadata file should not be rewritten"""
+        data = {"movies": [{
+            "cache_id": 1, "id": 42, "title": "Movie",
+            "path": "/some/path", "status": "downloaded",
+        }]}
+        self._write_metadata(data)
+        mtime_before = self.config.METADATA_FILE.stat().st_mtime_ns
+        self.cache.load_metadata()
+        mtime_after = self.config.METADATA_FILE.stat().st_mtime_ns
+        self.assertEqual(mtime_before, mtime_after)
+
+    # --- load_metadata edge cases ---
+
+    def test_load_empty_cache(self):
+        """Loading with no metadata file should return empty structure"""
+        # Remove the file if setUp created it
+        if self.config.METADATA_FILE.exists():
+            self.config.METADATA_FILE.unlink()
+        metadata = self.cache.load_metadata()
+        self.assertEqual(metadata, {"movies": []})
+
+    def test_load_corrupted_metadata(self):
+        """Corrupted metadata file should return empty structure"""
+        with open(self.config.METADATA_FILE, 'w') as f:
+            f.write("not valid json{{{")
+        metadata = self.cache.load_metadata()
+        self.assertEqual(metadata, {"movies": []})
+
+
 def run_tests(verbosity=2):
     """
     Run all tests
@@ -267,6 +465,7 @@ def run_tests(verbosity=2):
     suite.addTests(loader.loadTestsFromTestCase(TestScriptHelp))
     suite.addTests(loader.loadTestsFromTestCase(TestDependencies))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
+    suite.addTests(loader.loadTestsFromTestCase(TestTorrentCache))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=verbosity)
