@@ -329,46 +329,50 @@ class TorrentSearcher:
         print(f"Download directory: {movie_dir}")
         print("")
 
+        # Save metadata before starting download (download is blocking and may be interrupted)
+        movie_info = {
+            "cache_id": cache_id,
+            "id": movie.get("id"),
+            "title": title,
+            "year": year,
+            "quality": torrent.get("quality", "Unknown"),
+            "size": torrent.get("size", "Unknown"),
+            "rating": movie.get("rating", "N/A"),
+            "genres": movie.get("genres", []),
+            "directory": movie_dir_name,
+            "magnet_url": magnet_url,
+        }
+        self.cache.add_movie(movie_info)
+        print(f"Movie added to cache with ID: {cache_id}")
+
         # Call download-torrent.sh
         try:
-            # Check if we're in dev mode or production
             import os
             if os.environ.get("MY_TOOLKIT_DEV_MODE") == "1":
-                download_script = "./shell_scripts/download-torrent.sh"
-            else:
-                # In production, use my-toolkit command
-                download_script = "my-toolkit"
-                magnet_url = ["download-torrent", "--no-subtitles", "-d", str(movie_dir), magnet_url]
-                result = subprocess.run([download_script] + magnet_url[:-1] + [magnet_url[-1]])
-
-            if os.environ.get("MY_TOOLKIT_DEV_MODE") == "1":
-                result = subprocess.run([
-                    download_script,
-                    "--no-subtitles",  # We'll handle subtitles separately in torrent-watch
+                cmd = [
+                    "./shell_scripts/download-torrent.sh",
+                    "--no-subtitles",
                     "-d", str(movie_dir),
                     magnet_url
-                ])
+                ]
+            else:
+                cmd = [
+                    "my-toolkit", "download-torrent",
+                    "--no-subtitles",
+                    "-d", str(movie_dir),
+                    magnet_url
+                ]
+
+            result = subprocess.run(cmd)
 
             if result.returncode == 0:
-                # Add to cache metadata
-                movie_info = {
-                    "cache_id": cache_id,
-                    "id": movie.get("id"),
-                    "title": title,
-                    "year": year,
-                    "quality": torrent.get("quality", "Unknown"),
-                    "size": torrent.get("size", "Unknown"),
-                    "rating": movie.get("rating", "N/A"),
-                    "genres": movie.get("genres", []),
-                    "directory": movie_dir_name,
-                    "magnet_url": magnet_url,
-                }
-                self.cache.add_movie(movie_info)
-                print(f"\nMovie added to cache with ID: {cache_id}")
+                print(f"\nDownload completed!")
                 print(f"Use 'my-toolkit torrent-watch {cache_id}' to play")
                 return True
             else:
-                print("\nDownload failed!")
+                print(f"\nDownload exited with code {result.returncode}")
+                print(f"Movie is still in cache (ID: {cache_id})")
+                print(f"Files may be in: {movie_dir}")
                 return False
 
         except Exception as e:
