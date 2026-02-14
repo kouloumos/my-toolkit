@@ -1,0 +1,6 @@
+{
+  "copy_files": [
+    ".env", "CLAUDE.md"
+  ],
+  "default_base": "main"
+}

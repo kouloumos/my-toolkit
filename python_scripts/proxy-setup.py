@@ -100,12 +100,12 @@ http_access allow localnet
 http_access deny all
 
 # Logging (user-space)
-access_log {log_dir}/access.log
+access_log stdio:{log_dir}/access.log
 cache_log {log_dir}/cache.log
 
-# Cache settings (user-space, but disabled for privacy)
-cache_dir ufs {cache_dir} 100 16 256
+# Cache settings (disabled - forwarding proxy only)
 cache deny all
+cache_mem 0 MB
 
 # Residential proxy configuration
 cache_peer {proxy_host} parent {proxy_port} 0 no-query no-digest no-netdb-exchange connect-fail-limit=0 connect-timeout=1 default login={proxy_user}:{proxy_pass}

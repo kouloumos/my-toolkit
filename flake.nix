@@ -289,7 +289,7 @@
 
                   serviceConfig = {
                     Type = "forking";
-                    PIDFile = "%t/squid.pid";
+                    PIDFile = "%h/.cache/my-toolkit/squid/squid.pid";
                     ExecStart = "${pkgs.squid}/bin/squid -f %h/.config/my-toolkit/squid.conf";
                     ExecReload = "${pkgs.squid}/bin/squid -k reconfigure";
                     ExecStop = "${pkgs.squid}/bin/squid -k shutdown";

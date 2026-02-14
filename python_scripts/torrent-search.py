@@ -140,11 +140,6 @@ class YTSClient:
             "sort_by": "seeds",  # Most seeded first
         }
 
-        # Disable SSL warnings if verification is disabled
-        if not SSL_VERIFY:
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
         # Try each mirror until one works
         last_error = None
 
