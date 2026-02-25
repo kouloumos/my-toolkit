@@ -231,7 +231,7 @@ def cmd_teardown(args):
         worktree_path = Path(args.path).resolve()
         branch_name = None
     else:
-        print("Error: --branch or --path is required", file=sys.stderr)
+        print("Error: branch name or --path is required", file=sys.stderr)
         sys.exit(1)
 
     # Look up branch name from git if we don't have it
@@ -397,7 +397,7 @@ def cmd_land(args):
             print(f"Warning: Could not delete branch: {e}", file=sys.stderr)
     else:
         if not args.json:
-            print(f"\nTip: Run 'my-toolkit worktree teardown --branch {branch} --delete-branch' to clean up")
+            print(f"\nTip: Run 'my-toolkit worktree teardown {branch} --delete-branch' to clean up")
 
     if args.json:
         print(json.dumps(result_data))
@@ -445,7 +445,7 @@ Examples:
   my-toolkit worktree land feature-x --teardown
 
   # Teardown by branch name
-  my-toolkit worktree teardown --branch feature-x --delete-branch
+  my-toolkit worktree teardown feature-x --delete-branch
 
   # Teardown by path
   my-toolkit worktree teardown --path /path/to/repo-worktrees/feature-x
@@ -476,9 +476,9 @@ By default (without .worktree.json), .env is copied to new worktrees.
     p_create.add_argument("--json", action="store_true", help="Output JSON for scripting")
 
     # teardown
-    p_teardown = subparsers.add_parser("teardown", help="Remove a worktree")
-    p_teardown.add_argument("--branch", help="Branch name of the worktree to remove")
-    p_teardown.add_argument("--path", help="Full path to the worktree to remove")
+    p_teardown = subparsers.add_parser("teardown", aliases=["remove"], help="Remove a worktree")
+    p_teardown.add_argument("branch", nargs="?", help="Branch name of the worktree to remove")
+    p_teardown.add_argument("--path", help="Full path to the worktree to remove (alternative to branch name)")
     p_teardown.add_argument("--repo", help="Path to the git repository (default: auto-detect)")
     p_teardown.add_argument("--delete-branch", action="store_true", help="Also delete the branch")
     p_teardown.add_argument("--json", action="store_true", help="Output JSON for scripting")
@@ -507,6 +507,7 @@ By default (without .worktree.json), .env is copied to new worktrees.
     commands = {
         "create": cmd_create,
         "teardown": cmd_teardown,
+        "remove": cmd_teardown,
         "land": cmd_land,
         "list": cmd_list,
         "init": cmd_init,
