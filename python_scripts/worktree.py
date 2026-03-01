@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 DEFAULT_CONFIG = {
     "copy_files": [".env"],
     "default_base": "main",
+    "default_remote": "auto",
 }
 
 
@@ -53,8 +54,25 @@ class WorktreeConfig:
         return self._data.get("default_base", DEFAULT_CONFIG["default_base"])
 
     @property
+    def default_remote(self) -> str:
+        return self._data.get("default_remote", DEFAULT_CONFIG["default_remote"])
+
+    @property
     def copy_files(self) -> List[str]:
         return self._data.get("copy_files", DEFAULT_CONFIG["copy_files"])
+
+
+def resolve_remote(repo_path: Path, configured: str) -> str:
+    """Resolve the remote to use. If 'auto', prefer 'upstream' then 'origin'."""
+    if configured != "auto":
+        return configured
+    result = subprocess.run(
+        ["git", "remote"], cwd=repo_path, capture_output=True, text=True
+    )
+    remotes = result.stdout.strip().splitlines()
+    if "upstream" in remotes:
+        return "upstream"
+    return "origin"
 
 
 def git(*args, cwd: Optional[Path] = None, check: bool = True) -> subprocess.CompletedProcess:
@@ -151,6 +169,7 @@ def cmd_create(args):
         sys.exit(1)
 
     base = args.base or config.default_base
+    remote = resolve_remote(repo_path, config.default_remote)
 
     worktrees_dir = get_worktrees_dir(repo_path)
     worktree_path = worktrees_dir / branch
@@ -161,8 +180,19 @@ def cmd_create(args):
 
     worktrees_dir.mkdir(parents=True, exist_ok=True)
 
+    # Fetch latest base branch from remote before creating
+    remote_base = f"{remote}/{base}"
     try:
-        git("worktree", "add", "-b", branch, str(worktree_path), base, cwd=repo_path)
+        if not args.json:
+            print(f"Fetching {remote_base}...")
+        git("fetch", remote, base, cwd=repo_path)
+    except RuntimeError as e:
+        print(f"Warning: Could not fetch {remote_base}: {e}", file=sys.stderr)
+        print(f"Creating worktree from local {base} instead.", file=sys.stderr)
+        remote_base = base
+
+    try:
+        git("worktree", "add", "-b", branch, str(worktree_path), remote_base, cwd=repo_path)
     except RuntimeError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -458,10 +488,12 @@ Per-project configuration (.worktree.json in repo root):
     "copy_files": [".env"],
     "cleanup_command": "./run.sh --clean",
     "setup_command": "./run.sh",
-    "default_base": "main"
+    "default_base": "main",
+    "default_remote": "auto"
   }
 
 By default (without .worktree.json), .env is copied to new worktrees.
+The create command fetches the latest base branch from the remote before creating.
         """
     )
 
