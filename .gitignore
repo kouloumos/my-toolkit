@@ -1,0 +1,15 @@
+# Python cache
+**/__pycache__/
+**/*.pyc
+
+# Nix build output
+result
+
+# Configuration files with potential secrets
+**/squid.conf
+**/*credentials*.json
+**/.env
+
+# IDE
+**/.vscode/
+**/.idea/

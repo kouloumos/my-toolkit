@@ -539,6 +539,7 @@ When users report issues, check:
 - Use imperative mood: "Add feature" not "Added feature"
 - Reference script/component: "torrent-watch: Add subtitle support"
 - Explain why, not just what
+- **Never add Co-Authored-By or any AI attribution to commits**
 
 Good examples:
 ```
